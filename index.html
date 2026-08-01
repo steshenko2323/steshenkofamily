@@ -127,7 +127,7 @@
   .kp-meta span { display: flex; align-items: center; gap: 4px; }
   .kp-meta .dot { color: #ccc; }
 
-  /* ---- РЕЙТИНГ ---- */
+  /* ---- РЕЙТИНГ С КЛИКАБЕЛЬНЫМИ ЗВЁЗДАМИ ---- */
   .kp-rating-block {
     display: flex;
     align-items: center;
@@ -152,6 +152,7 @@
     gap: 4px;
     font-size: 28px;
     cursor: pointer;
+    user-select: none;
   }
   .kp-rating-stars .star {
     color: #d0d0d0;
@@ -211,7 +212,7 @@
   }
   .kp-btn-share:hover { border-color: #999; background: #f8f8f8; }
 
-  /* ---- ПРАВАЯ КОЛОНКА (счётчик) ---- */
+  /* ---- ПРАВАЯ КОЛОНКА ---- */
   .kp-sidebar {
     display: flex;
     flex-direction: column;
@@ -553,20 +554,20 @@
       <!-- Рейтинг -->
       <div class="kp-rating-block">
         <div class="kp-rating-big">
-          <span id="kpRatingDisplay">0.0</span>
+          <span id="kpRatingDisplay">10.0</span>
           <span class="ten">/ 10</span>
         </div>
 
         <div class="kp-rating-stars" id="kpStars">
-          <span class="star" data-v="1">★</span>
-          <span class="star" data-v="2">★</span>
-          <span class="star" data-v="3">★</span>
-          <span class="star" data-v="4">★</span>
-          <span class="star" data-v="5">★</span>
+          <span class="star filled" data-v="1">★</span>
+          <span class="star filled" data-v="2">★</span>
+          <span class="star filled" data-v="3">★</span>
+          <span class="star filled" data-v="4">★</span>
+          <span class="star filled" data-v="5">★</span>
         </div>
 
         <div class="kp-rating-stats">
-          <b id="kpVotesCount">0</b> оценок
+          <b id="kpVotesCount">3</b> оценки
         </div>
       </div>
 
@@ -709,57 +710,74 @@
 </div>
 
 <script>
-  // ===== РЕЙТИНГ =====
+  // ===== РЕЙТИНГ С НАЧАЛЬНЫМИ ЗНАЧЕНИЯМИ 10.0 (3 ОЦЕНКИ) =====
   const stars = document.querySelectorAll('#kpStars .star');
   const ratingDisplay = document.getElementById('kpRatingDisplay');
   const votesCount = document.getElementById('kpVotesCount');
 
-  let userRating = parseInt(localStorage.getItem('kp_userRating')) || 0;
-  let totalRating = parseInt(localStorage.getItem('kp_totalRating')) || 0;
-  let totalVotes = parseInt(localStorage.getItem('kp_totalVotes')) || 0;
+  // Ключи для localStorage
+  const USER_KEY = 'kp_userRating';
+  const TOTAL_KEY = 'kp_totalRating';
+  const VOTES_KEY = 'kp_totalVotes';
 
-  function updateRating() {
-    stars.forEach(s => {
-      const v = parseInt(s.dataset.v);
-      s.classList.toggle('filled', v <= userRating);
-    });
-
-    if (totalVotes === 0) {
-      ratingDisplay.textContent = '0.0';
-      votesCount.textContent = '0';
-    } else {
-      const avg = totalRating / totalVotes;
-      ratingDisplay.textContent = (avg * 2).toFixed(1);
-      votesCount.textContent = totalVotes;
-    }
+  // Если данных нет — устанавливаем 10.0 (3 оценки по 5 звёзд = 15)
+  if (localStorage.getItem(TOTAL_KEY) === null) {
+    localStorage.setItem(USER_KEY, '0');          // пользователь ещё не оценил
+    localStorage.setItem(TOTAL_KEY, '15');        // 3 * 5 звёзд
+    localStorage.setItem(VOTES_KEY, '3');
   }
 
+  let userRating = parseInt(localStorage.getItem(USER_KEY)) || 0;
+  let totalRating = parseInt(localStorage.getItem(TOTAL_KEY)) || 15;
+  let totalVotes = parseInt(localStorage.getItem(VOTES_KEY)) || 3;
+
+  // Функция обновления интерфейса
+  function updateRating() {
+    // Заполняем звёзды: если пользователь поставил оценку — показываем его, иначе среднюю
+    let displayStars = userRating > 0 ? userRating : Math.round(totalRating / totalVotes);
+    stars.forEach(s => {
+      const v = parseInt(s.dataset.v);
+      s.classList.toggle('filled', v <= displayStars);
+    });
+
+    // Отображаем рейтинг (из шкалы 1–5 переводим в 10-балльную)
+    const avg = totalRating / totalVotes;
+    ratingDisplay.textContent = (avg * 2).toFixed(1);
+    votesCount.textContent = totalVotes;
+  }
+
+  // Клик по звезде
   stars.forEach(star => {
     star.addEventListener('click', () => {
       const v = parseInt(star.dataset.v);
 
       if (userRating === v) {
+        // Сброс: убираем оценку пользователя
         if (totalVotes > 0) {
           totalVotes--;
           totalRating = Math.max(0, totalRating - v);
         }
         userRating = 0;
       } else {
+        // Если пользователь уже оценил — откатываем старую
         if (userRating > 0 && totalVotes > 0) {
           totalVotes--;
           totalRating = Math.max(0, totalRating - userRating);
         }
+        // Ставим новую
         userRating = v;
         totalVotes++;
         totalRating += v;
       }
 
-      localStorage.setItem('kp_userRating', userRating);
-      localStorage.setItem('kp_totalRating', totalRating);
-      localStorage.setItem('kp_totalVotes', totalVotes);
+      // Сохраняем
+      localStorage.setItem(USER_KEY, userRating);
+      localStorage.setItem(TOTAL_KEY, totalRating);
+      localStorage.setItem(VOTES_KEY, totalVotes);
       updateRating();
     });
 
+    // Эффект наведения (подсветка)
     star.addEventListener('mouseenter', () => {
       const v = parseInt(star.dataset.v);
       stars.forEach(s => {
@@ -772,9 +790,10 @@
     });
   });
 
+  // Первоначальное отображение
   updateRating();
 
-  // ===== ВКЛАДКИ =====
+  // ===== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК =====
   document.querySelectorAll('.kp-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.kp-tab').forEach(t => t.classList.remove('active'));
@@ -810,7 +829,7 @@
     document.getElementById('kpShareModal').classList.remove('open');
   }
 
-  // ===== ESC =====
+  // ===== ЗАКРЫТИЕ МОДАЛОК ПО ESC =====
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.getElementById('kpTrailerModal').classList.remove('open');
